@@ -16,33 +16,21 @@ from .models import TYPE_HELP, TYPES
 from .vault import Vault
 
 INSTRUCTIONS = """\
-Keymaster is the user's personal, locally-encrypted credential vault. It is the source of truth
-for their logins, tokens, API keys, SSH keys, AWS keys, DB passwords and 2FA seeds.
+CHECK KEYMASTER FIRST for anything that needs credentials: it is the user's encrypted vault and
+the source of truth for their passwords, tokens, API keys, SSH/AWS keys, DB logins and 2FA seeds.
+Call `find_credentials` (URL, host, service name or phrase) — or `list_credentials` when asked
+what creds exist — BEFORE looking at env vars, dotfiles, ~/.aws, `gh auth`, the OS keychain or the
+repo, and without asking the user where a password is.
 
-WHEN TO USE: any time a task needs to authenticate to something — Jenkins/CI, a web UI, an API,
-AWS, a database, a git host, a VPN, a server — call `find_credentials` FIRST with whatever you
-have (the URL, hostname, service name or a phrase like "jenkins prod"). Do NOT ask the user where
-the password is, and do not search the filesystem or env for secrets. The user expects you to
-just know.
+Then use the least-exposing tool: `http_request` (auth injected, only to the credential's
+registered hosts) > `run_with_credential` (secret in env vars like $KM_PASSWORD / $KM_TOKEN /
+AWS_* / PG*, output scrubbed) > `get_totp` > `copy_to_clipboard` > `get_credential(reveal=true)`
+(only to type into a login form; never repeat it in replies, files or commits).
 
-HOW TO USE, in order of preference (least exposure first):
-  1. `http_request`       — call an API with auth injected; the secret never enters the chat.
-  2. `run_with_credential` — run a shell command with the secret in env vars ($KM_USERNAME,
-                             $KM_PASSWORD, $KM_TOKEN, $KM_SECRET, AWS_*, PG*, $KM_KEY_FILE…);
-                             output is scrubbed of the secret.
-  3. `get_totp`           — current 2FA code when a login asks for one.
-  4. `copy_to_clipboard`  — when the human will paste it themselves.
-  5. `get_credential(reveal=true)` — only when you must type the value yourself (e.g. a
-                             browser login form). Never repeat a revealed secret in your reply,
-                             in files, commits or logs.
-
-Some credentials need the human to approve (a macOS dialog / Touch ID pops up; the call waits).
-If access is denied, do not retry — ask the user. If a match is ambiguous, ask which one.
-If nothing matches, offer to store it with `add_credential(secret_source="prompt")`, which makes
-the user type the secret into a secure dialog so it never passes through the conversation.
-When the user gives you a new URL/alias for an existing credential, save it with
-`update_credential(add_urls=[...])` so next time lookup is instant.
-If the vault is locked, call `unlock_vault` (the user types the passphrase in a dialog).
+Some access pops a macOS dialog / Touch ID for the user; if denied, don't retry — ask. If a match
+is ambiguous, ask which one. If nothing matches, offer `add_credential(secret_source="prompt")`
+so the user types the secret in a secure dialog. Save new URLs/aliases the user mentions with
+`update_credential(add_urls=[...], add_aliases=[...])`. If locked, call `unlock_vault`.
 """
 
 mcp = MCPServer(name="keymaster", instructions=INSTRUCTIONS, version=__version__, log_level="WARNING")
@@ -104,15 +92,19 @@ def vault_status(k: Keymaster) -> dict:
 def find_credentials(
     k: Keymaster, query: str, limit: int = 5, type: CredType | None = None, tag: str | None = None
 ) -> dict:
-    """Find the credential(s) for a URL, hostname, name, alias or free-text phrase
-    (e.g. "https://ci.example.com/job/x", "jenkins", "prod db", "aws sg").
-    Returns ranked matches with metadata only (secrets hidden), plus `ambiguous` when unsure."""
+    """ALWAYS THE FIRST STEP when anything needs credentials — a login, an API call, a CLI or DB
+    that needs auth, a 2FA code, or the user asking for a password/token/key. Pass whatever you
+    have: a URL, hostname, name, alias or phrase ("https://ci.example.com/job/x", "jenkins",
+    "prod db", "aws sg"). Returns ranked matches, metadata only (secrets hidden), and flags
+    `ambiguous` when you should ask the user which one."""
     return k.find(query, limit=max(1, min(limit, 20)), type=type, tag=tag)
 
 
 @tool(RO)
 def list_credentials(k: Keymaster, type: CredType | None = None, tag: str | None = None) -> dict:
-    """List all credentials (metadata only), optionally filtered by type or tag."""
+    """List every stored credential (metadata only — names, types, usernames, URLs, aliases,
+    tags, policies). Use this to answer "what creds / passwords / logins / keys do you have?".
+    Optionally filter by type or tag."""
     items = k.list(type=type, tag=tag)
     return {"count": len(items), "credentials": items}
 

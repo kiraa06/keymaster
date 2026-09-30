@@ -111,7 +111,7 @@ ok "$(km version) → $bindir"
 if [ -z "${KEYMASTER_SKIP_MCP:-}" ]; then
 	if command -v claude >/dev/null 2>&1; then
 		if km install-mcp >/dev/null 2>&1; then
-			ok "registered with Claude Code (user scope) — restart Claude Code to load it"
+			ok "Claude Code: MCP server + prompt hook + CLAUDE.md rule — restart Claude Code to load them"
 		else
 			warn "couldn't register with Claude Code; run: km install-mcp"
 		fi

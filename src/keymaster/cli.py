@@ -1010,20 +1010,55 @@ def touchid_test() -> None:
 
 # ============================================================================ integration
 @app.command("install-mcp")
-def install_mcp(scope: str = typer.Option("user", help="Claude Code scope: user|project|local")) -> None:
-    """Register the Keymaster MCP server with Claude Code."""
+def install_mcp(
+    scope: str = typer.Option("user", help="Claude Code scope: user|project|local"),
+    hook: bool = typer.Option(True, help="Add a UserPromptSubmit hook that reminds the agent to check Keymaster first"),
+    claude_md: bool = typer.Option(
+        True, "--claude-md/--no-claude-md", help="Add a 'check Keymaster first' rule to ~/.claude/CLAUDE.md"
+    ),
+) -> None:
+    """Register with Claude Code — and make sure the agent actually reaches for Keymaster first."""
+    from . import integrations
+
     exe = shutil.which("keymaster-mcp") or str(Path(sys.executable).parent / "keymaster-mcp")
+    hook_exe = shutil.which("keymaster-hook") or str(Path(sys.executable).parent / "keymaster-hook")
     claude = shutil.which("claude")
-    if not claude:
-        console.print(f"Claude CLI not found. Add manually:\n  claude mcp add --scope {scope} keymaster -- {exe}")
-        return
-    subprocess.run([claude, "mcp", "remove", "--scope", scope, "keymaster"], capture_output=True)
-    r = subprocess.run([claude, "mcp", "add", "--scope", scope, "keymaster", "--", exe], capture_output=True, text=True)
-    if r.returncode != 0:
-        _fail(r.stderr or r.stdout)
-    console.print(f"[green]✓[/] Registered with Claude Code ({scope} scope) → {exe}")
-    console.print("For other MCP clients (Claude Desktop, Cursor…):")
+    if claude:
+        subprocess.run([claude, "mcp", "remove", "--scope", scope, "keymaster"], capture_output=True)
+        r = subprocess.run(
+            [claude, "mcp", "add", "--scope", scope, "keymaster", "--", exe], capture_output=True, text=True
+        )
+        if r.returncode != 0:
+            _fail(r.stderr or r.stdout)
+        console.print(f"[green]✓[/] MCP server registered with Claude Code ({scope} scope) → {exe}")
+    else:
+        console.print(
+            f"[yellow]•[/] Claude CLI not found. Add manually: claude mcp add --scope {scope} keymaster -- {exe}"
+        )
+    cdir = integrations.claude_dir()
+    if hook:
+        st = integrations.install_hook(cdir / "settings.json", hook_exe)
+        console.print(f"[green]✓[/] prompt hook {st} in {cdir / 'settings.json'}")
+    if claude_md:
+        st = integrations.install_claude_md(cdir / "CLAUDE.md")
+        console.print(f"[green]✓[/] 'check Keymaster first' rule {st} in {cdir / 'CLAUDE.md'}")
+    console.print("[dim]Restart Claude Code to load it. Other MCP clients:[/]")
     console.print_json(json.dumps({"mcpServers": {"keymaster": {"command": exe}}}))
+
+
+@app.command("uninstall-mcp")
+def uninstall_mcp(scope: str = typer.Option("user")) -> None:
+    """Remove the MCP registration, prompt hook and CLAUDE.md rule (your vault is untouched)."""
+    from . import integrations
+
+    if shutil.which("claude"):
+        subprocess.run(["claude", "mcp", "remove", "--scope", scope, "keymaster"], capture_output=True)
+        console.print("[green]✓[/] MCP server unregistered")
+    cdir = integrations.claude_dir()
+    if integrations.remove_hook(cdir / "settings.json"):
+        console.print("[green]✓[/] prompt hook removed")
+    if integrations.remove_claude_md(cdir / "CLAUDE.md"):
+        console.print("[green]✓[/] CLAUDE.md rule removed")
 
 
 @app.command("git-credential", hidden=True)

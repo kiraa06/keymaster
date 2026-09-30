@@ -1,6 +1,6 @@
 [project]
 name = "keymaster"
-version = "1.0.0"
+version = "1.1.0"
 description = "Local, encrypted credential vault with an MCP server so AI agents can log in without you pasting passwords."
 readme = "README.md"
 authors = [
@@ -39,6 +39,7 @@ Changelog = "https://github.com/kiraa06/keymaster/releases"
 km = "keymaster.cli:main"
 keymaster = "keymaster.cli:main"
 keymaster-mcp = "keymaster.server:main"
+keymaster-hook = "keymaster.hook:main"
 
 [build-system]
 requires = ["uv_build>=0.11.16,<0.12.0"]

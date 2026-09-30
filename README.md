@@ -78,8 +78,8 @@ km add okta      -u ada --url '*.okta.com' --totp       # with its 2FA seed
 km touchid setup                          # approve with your fingerprint 👆
 ```
 
-Then ask your agent to do things. It calls `find_credentials` whenever a task needs a login,
-because the server tells it to.
+Then ask your agent to do things. It checks Keymaster whenever a task needs a login (see
+[below](#makes-sure-the-agent-checks-it-first)).
 
 | Command | |
 |---|---|
@@ -102,6 +102,23 @@ prefixes, bare hosts, `*.wildcards`), a `host` field, **tags** or username, and 
 tolerated. `https://ci.example.com/job/deploy-api/412` finds `jenkins-ci`, and so do `jenkins`,
 `ci`, and `jenkns`. When two credentials fit equally well, the agent is told to ask you instead
 of guessing.
+
+### Makes sure the agent checks it first
+
+MCP server instructions alone are easy to miss. With many servers configured, Claude Code defers
+their tools, so the model sees only tool names, and it truncates long instructions. So
+`km install-mcp` sets up three layers:
+
+1. **The MCP server.** Its instructions and tool descriptions lead with "check Keymaster first".
+2. **A `UserPromptSubmit` hook** (`keymaster-hook`, about 0.15s). When a prompt mentions creds,
+   passwords, tokens, keys, logins or 2FA, or matches a stored credential's name, alias or host,
+   it adds a reminder to the agent's context, naming the credentials that match. It only ever
+   prints names, never secrets.
+3. **A short rule in `~/.claude/CLAUDE.md`**, between `<!-- keymaster:start/end -->` markers.
+
+You can opt out of either extra layer with `--no-hook` / `--no-claude-md`, and
+`km uninstall-mcp` removes all three. Other hooks in `settings.json` are preserved, and the file
+is backed up first.
 
 ### Uses secrets without showing them
 
@@ -183,6 +200,10 @@ Use the absolute path that `which keymaster-mcp` prints.
 
 ## Troubleshooting
 
+**The agent looked for creds somewhere else (`~/.aws`, `gh auth`, env vars).** Run
+`km install-mcp` again: it adds the prompt hook and the CLAUDE.md rule if they're missing. Then
+start a new Claude Code session, since hooks and CLAUDE.md load at startup.
+
 **The agent says the vault is locked.** Run `km unlock`, or let it call `unlock_vault`, which
 asks you for the passphrase in a dialog. If you set `auto_lock_hours`, this is expected.
 
@@ -207,7 +228,7 @@ new passphrase and `km recovery` mints a fresh code.
 ## Uninstall
 
 ```sh
-claude mcp remove keymaster -s user
+km uninstall-mcp               # MCP server + prompt hook + CLAUDE.md rule
 uv tool uninstall keymaster
 rm -rf ~/.keymaster            # ⚠ deletes your vault — `km export` first if you want it
 ```

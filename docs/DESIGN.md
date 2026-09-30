@@ -144,6 +144,24 @@ Matches under 35 are dropped. When a URL query has a real host match (75+), matc
 also dropped, so shared words like `example` or `ci` don't add noise. If the top two scores are
 within 8 points, the result is flagged `ambiguous` and the agent is told to ask you.
 
+## Getting the agent to use it
+
+A server's instructions are a weak signal. Claude Code shows an MCP server's instructions once,
+truncates them past about 2 KB, and with many servers it *defers* their tools, so the model sees
+only names until it searches for them. In practice an agent asked "what creds do you have?"
+would fall back to `aws configure list-profiles` and `gh auth status`. So Keymaster installs
+three layers:
+
+| layer | when it acts | strength |
+|---|---|---|
+| server instructions + tool descriptions (rule in the first line) | tools are listed | weak |
+| `~/.claude/CLAUDE.md` block | every session, always in context | strong |
+| `keymaster-hook` on `UserPromptSubmit` | every prompt that looks credential-related | strongest: specific and timely |
+
+The hook matches credential-intent words, plus stored names, aliases and hosts (read only when
+the vault is already unlocked). It prints only credential names. It never raises and always
+exits 0, so it can't block a prompt.
+
 ## Durability
 
 - Writes go to a temp file, then `fsync`, `rename` and a directory `fsync`.
