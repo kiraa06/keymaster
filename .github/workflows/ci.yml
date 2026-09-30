@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Sync
+        run: uv sync --python ${{ matrix.python }}
+      - name: Lint
+        run: |
+          uvx ruff check src tests
+          uvx ruff format --check src tests
+      - name: Test
+        run: uv run --python ${{ matrix.python }} pytest -q
+
+  install-script:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: shellcheck
+        if: runner.os == 'Linux'
+        run: shellcheck install.sh
+      - name: Run install.sh from this checkout
+        env:
+          KEYMASTER_SOURCE: ${{ github.workspace }}
+          KEYMASTER_SKIP_INIT: "1"
+          KEYMASTER_SKIP_MCP: "1"
+        run: sh install.sh
+      - name: Smoke test the installed commands
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          km version
+          km types
+          km gen -n 2
+          test -x "$(command -v keymaster-mcp)"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - name: Wheel installs and runs
+        run: uvx --from dist/*.whl km version

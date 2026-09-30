@@ -1,0 +1,74 @@
+[project]
+name = "keymaster"
+version = "1.0.0"
+description = "Local, encrypted credential vault with an MCP server so AI agents can log in without you pasting passwords."
+readme = "README.md"
+authors = [
+    { name = "Kiran P Jose", email = "kiran.p.jose02@gmail.com" }
+]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["mcp", "password-manager", "credentials", "vault", "claude", "ai-agents", "keychain", "totp"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security :: Cryptography",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=44",
+    "httpx>=0.28.1",
+    "keyring>=25.7.0",
+    "mcp>=2.2,<3",
+    "typer>=0.27.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/kiraa06/keymaster"
+Issues = "https://github.com/kiraa06/keymaster/issues"
+Changelog = "https://github.com/kiraa06/keymaster/releases"
+
+[project.scripts]
+km = "keymaster.cli:main"
+keymaster = "keymaster.cli:main"
+keymaster-mcp = "keymaster.server:main"
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = [
+    "S101",  # assert is fine
+    "S603",  # subprocess with argv lists is intentional (osascript, pbcopy, user commands)
+    "S607",  # partial executable paths (pbcopy, osascript, zenity) are resolved via PATH on purpose
+    "S110",  # best-effort cleanup paths
+    "S105",  # "password"/"token" field names are not hardcoded secrets
+    "S108",  # /tmp in tests
+    "S107",  # parameter defaults like secret_source="prompt" are not passwords
+    "B008",  # typer.Option(...) in defaults is Typer's idiom
+    "E501",  # the formatter owns line length; long user-facing strings stay whole
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
