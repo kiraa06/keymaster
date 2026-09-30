@@ -85,7 +85,9 @@ else
 			else
 				actual="$(sha256sum "$wheel" | awk '{print $1}')"
 			fi
-			[ -n "$expected" ] && [ "$expected" = "$actual" ] || die "checksum mismatch for $(basename "$wheel")"
+			if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+				die "checksum mismatch for $(basename "$wheel")"
+			fi
 			ok "checksum verified"
 		fi
 		target="$wheel"
